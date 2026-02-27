@@ -1,0 +1,79 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.pnpm-store/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Testing
+coverage/
+htmlcov/
+.coverage
+.pytest_cache/
+.mypy_cache/
+
+# Logs
+*.log
+logs/
+
+# Temp
+tmp/
+temp/
+*.tmp
+
+# Python virtual env
+.venv/
+venv/
+env/
+
+# Ruff
+.ruff_cache/
+
+# Vite
+*.local
+
+# Separate repos
+sunarp-agent/
+
+# Deployment artifacts
+*.zip
+
+# Screenshots / debug assets
+*.png
+*.md.bak
+cloudshell-logs*.md
+
+# Claude Code
+.claude/
+.playwright-mcp/
+memory/
+
+# Prompt files
+PROMPT*.md
+
+# Storage (local)
+storage/
+test_storage/

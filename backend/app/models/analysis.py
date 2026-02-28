@@ -116,7 +116,5 @@ class AnalysisDetailResponse(BaseModel):
     completed_at: datetime | None = None
     duration_seconds: int | None = None
     claude_cost_usd: Decimal | None = None
+    progress_log: str | None = None
     created_at: datetime
-
-
-# PdfUrlResponse removed - PDF is served directly via GET /analyses/{id}/pdf

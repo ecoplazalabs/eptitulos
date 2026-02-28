@@ -203,6 +203,7 @@ def _map_to_detail(record: dict) -> AnalysisDetailResponse:
         completed_at=record.get("completed_at"),
         duration_seconds=record.get("duration_seconds"),
         claude_cost_usd=record.get("claude_cost_usd"),
+        progress_log=record.get("progress_log"),
         created_at=record["created_at"],
     )
 

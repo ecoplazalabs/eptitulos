@@ -59,6 +59,11 @@ class AnalysisCallbackRequest(BaseModel):
     pdf_base64: str | None = None   # base64-encoded PDF bytes
 
 
+class AnalysisProgressRequest(BaseModel):
+    analysis_id: str
+    log_lines: str
+
+
 class CallbackResponse(BaseModel):
     status: str
 
@@ -168,4 +173,38 @@ async def analysis_callback(
         analysis_id=body.analysis_id,
         status=body.status,
     )
+    return CallbackResponse(status="ok")
+
+
+@router.post(
+    "/analysis-progress",
+    response_model=CallbackResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(verify_api_key)],
+)
+async def analysis_progress(
+    body: AnalysisProgressRequest,
+    session: AsyncSession = Depends(get_db),
+) -> CallbackResponse:
+    """
+    Internal endpoint called by the sunarp-agent to stream progress logs.
+
+    Appends log_lines to the progress_log column of the analysis.
+    Authentication is via the X-Api-Key header (service-to-service).
+    """
+    repo = AnalysisRepository(session)
+
+    try:
+        await repo.get_by_id_internal(body.analysis_id)
+    except AnalysisNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Analysis {body.analysis_id} not found",
+        ) from None
+
+    await repo.append_progress_log(
+        analysis_id=body.analysis_id,
+        log_lines=body.log_lines,
+    )
+
     return CallbackResponse(status="ok")

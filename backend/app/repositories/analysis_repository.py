@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any
 
 import structlog
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.db import SunarpAnalysis
@@ -277,6 +277,29 @@ class AnalysisRepository:
         logger.info("analysis_cancelled", analysis_id=str(analysis_id))
         return _to_dict(analysis)
 
+    async def append_progress_log(
+        self,
+        analysis_id: uuid.UUID | str,
+        log_lines: str,
+    ) -> None:
+        """
+        Atomically append lines to the progress_log column.
+
+        Uses COALESCE to handle NULL and RIGHT() to cap at 50KB,
+        keeping the most recent content.
+        """
+        aid = uuid.UUID(str(analysis_id)) if not isinstance(analysis_id, uuid.UUID) else analysis_id
+
+        await self._session.execute(
+            text(
+                "UPDATE sunarp_analyses "
+                "SET progress_log = RIGHT(COALESCE(progress_log, '') || :lines, 51200) "
+                "WHERE id = :aid"
+            ),
+            {"lines": log_lines, "aid": aid},
+        )
+        await self._session.flush()
+
     async def check_duplicate(self, user_id: str, oficina: str, partida: str) -> bool:
         """
         Return True if there is already a pending or processing analysis
@@ -316,6 +339,7 @@ def _to_dict(analysis: SunarpAnalysis) -> dict[str, Any]:
         "completed_at": analysis.completed_at,
         "duration_seconds": analysis.duration_seconds,
         "claude_cost_usd": analysis.claude_cost_usd,
+        "progress_log": analysis.progress_log,
         "created_at": analysis.created_at,
         "updated_at": analysis.updated_at,
     }

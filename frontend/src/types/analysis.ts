@@ -23,6 +23,7 @@ export interface Analysis {
   completed_at: string | null;
   duration_seconds: number | null;
   claude_cost_usd: number | null;
+  progress_log: string | null;
   created_at: string;
   updated_at: string;
 }

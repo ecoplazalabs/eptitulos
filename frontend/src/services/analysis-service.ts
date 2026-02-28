@@ -52,4 +52,15 @@ export const analysisService = {
     );
     return response.data.data;
   },
+
+  async cancel(id: string): Promise<Analysis> {
+    const response = await api.post<ApiResponse<Analysis>>(
+      `/api/sunarp/analyses/${id}/cancel`,
+    );
+    return response.data.data;
+  },
+
+  async delete(id: string): Promise<void> {
+    await api.delete(`/api/sunarp/analyses/${id}`);
+  },
 };

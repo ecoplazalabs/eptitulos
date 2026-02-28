@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any
 
 import structlog
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.db import SunarpAnalysis
@@ -202,6 +202,79 @@ class AnalysisRepository:
             status=status,
             duration_seconds=values.get("duration_seconds"),
         )
+        return _to_dict(analysis)
+
+    async def delete_analysis(
+        self,
+        analysis_id: uuid.UUID | str,
+        user_id: str,
+    ) -> None:
+        """
+        Hard-delete an analysis scoped to the given user.
+
+        Raises AnalysisNotFoundError if not found or not owned by user_id.
+        """
+        try:
+            aid = analysis_id if isinstance(analysis_id, uuid.UUID) else uuid.UUID(str(analysis_id))
+            uid = user_id if isinstance(user_id, uuid.UUID) else uuid.UUID(str(user_id))
+        except ValueError as exc:
+            raise AnalysisNotFoundError(f"Analysis {analysis_id} not found") from exc
+
+        result = await self._session.execute(
+            delete(SunarpAnalysis).where(
+                SunarpAnalysis.id == aid,
+                SunarpAnalysis.requested_by == uid,
+            )
+        )
+        if result.rowcount == 0:
+            raise AnalysisNotFoundError(f"Analysis {analysis_id} not found")
+
+        logger.info("analysis_deleted", analysis_id=str(analysis_id))
+
+    async def cancel_analysis(
+        self,
+        analysis_id: uuid.UUID | str,
+        user_id: str,
+    ) -> dict[str, Any]:
+        """
+        Set an analysis status to 'failed' with error_message 'Cancelled by user'.
+
+        Only updates if the current status is 'pending' or 'processing' and the
+        record belongs to user_id.
+
+        Raises AnalysisNotFoundError if not found or not owned by user_id.
+        Raises AnalysisRepositoryError if the status is not cancellable.
+        """
+        try:
+            aid = analysis_id if isinstance(analysis_id, uuid.UUID) else uuid.UUID(str(analysis_id))
+            uid = user_id if isinstance(user_id, uuid.UUID) else uuid.UUID(str(user_id))
+        except ValueError as exc:
+            raise AnalysisNotFoundError(f"Analysis {analysis_id} not found") from exc
+
+        existing_result = await self._session.execute(
+            select(SunarpAnalysis).where(
+                SunarpAnalysis.id == aid,
+                SunarpAnalysis.requested_by == uid,
+            )
+        )
+        analysis = existing_result.scalar_one_or_none()
+        if analysis is None:
+            raise AnalysisNotFoundError(f"Analysis {analysis_id} not found")
+
+        if analysis.status not in ("pending", "processing"):
+            raise AnalysisRepositoryError(
+                f"Analysis {analysis_id} cannot be cancelled: current status is '{analysis.status}'"
+            )
+
+        await self._session.execute(
+            update(SunarpAnalysis)
+            .where(SunarpAnalysis.id == aid)
+            .values(status="failed", error_message="Cancelled by user")
+        )
+        await self._session.flush()
+        await self._session.refresh(analysis)
+
+        logger.info("analysis_cancelled", analysis_id=str(analysis_id))
         return _to_dict(analysis)
 
     async def check_duplicate(self, user_id: str, oficina: str, partida: str) -> bool:

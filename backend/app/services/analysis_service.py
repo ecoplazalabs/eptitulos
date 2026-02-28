@@ -9,13 +9,20 @@ from app.models.analysis import (
     CreateAnalysisRequest,
 )
 from app.models.common import PaginationMeta
-from app.repositories.analysis_repository import AnalysisRepository
+from app.repositories.analysis_repository import (
+    AnalysisRepository,
+    AnalysisRepositoryError,
+)
 
 logger = structlog.get_logger(__name__)
 
 
 class DuplicateAnalysisError(Exception):
     """Raised when a pending/processing analysis already exists for this partida."""
+
+
+class AnalysisNotCancellableError(Exception):
+    """Raised when attempting to cancel an analysis that is not in a cancellable state."""
 
 
 class AnalysisService:
@@ -131,6 +138,46 @@ class AnalysisService:
         """
         record = await self._repo.get_by_id(analysis_id=analysis_id, user_id=user_id)
         return record.get("pdf_path")
+
+    async def delete_analysis(self, analysis_id: str, user_id: str) -> None:
+        """
+        Hard-delete an analysis owned by user_id.
+
+        Raises AnalysisNotFoundError if not found or not owned by the user.
+        Raises AnalysisNotCancellableError if the analysis is currently processing.
+        """
+        log = logger.bind(user_id=user_id, analysis_id=analysis_id)
+
+        record = await self._repo.get_by_id(analysis_id=analysis_id, user_id=user_id)
+
+        if record["status"] == "processing":
+            log.warning("analysis_delete_rejected_processing")
+            raise AnalysisNotCancellableError(
+                "Cannot delete an analysis that is currently processing"
+            )
+
+        await self._repo.delete_analysis(analysis_id=analysis_id, user_id=user_id)
+        log.info("analysis_deleted")
+
+    async def cancel_analysis(self, analysis_id: str, user_id: str) -> AnalysisDetailResponse:
+        """
+        Cancel a pending or processing analysis by setting its status to 'failed'.
+
+        Raises AnalysisNotFoundError if not found or not owned by the user.
+        Raises AnalysisNotCancellableError if the current status is not cancellable.
+        """
+        log = logger.bind(user_id=user_id, analysis_id=analysis_id)
+
+        try:
+            record = await self._repo.cancel_analysis(
+                analysis_id=analysis_id, user_id=user_id
+            )
+        except AnalysisRepositoryError as exc:
+            log.warning("analysis_cancel_rejected", reason=str(exc))
+            raise AnalysisNotCancellableError(str(exc)) from exc
+
+        log.info("analysis_cancelled")
+        return _map_to_detail(record)
 
 
 # ---------------------------------------------------------------------------

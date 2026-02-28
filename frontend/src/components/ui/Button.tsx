@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import type { ButtonHTMLAttributes } from 'react';
 import { cn } from '@/lib/cn';
 import Spinner from '@/components/ui/Spinner';
@@ -11,21 +12,25 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   asChild?: boolean;
 }
 
-export default function Button({
-  variant = 'primary',
-  size = 'md',
-  loading = false,
-  fullWidth = false,
-  asChild: _asChild,
-  disabled,
-  className,
-  children,
-  ...props
-}: ButtonProps) {
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  {
+    variant = 'primary',
+    size = 'md',
+    loading = false,
+    fullWidth = false,
+    asChild: _asChild,
+    disabled,
+    className,
+    children,
+    ...props
+  },
+  ref,
+) {
   const isDisabled = disabled || loading;
 
   return (
     <button
+      ref={ref}
       disabled={isDisabled}
       aria-busy={loading}
       className={cn(
@@ -74,4 +79,6 @@ export default function Button({
       {children}
     </button>
   );
-}
+});
+
+export default Button;

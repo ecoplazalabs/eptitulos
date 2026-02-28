@@ -21,7 +21,7 @@ async def trigger_sunarp_analysis(
 
     Raises N8nWebhookError if the webhook call fails.
     """
-    url = f"{settings.n8n_webhook_url}/sunarp-analyze"
+    url = settings.n8n_webhook_url
     payload = {
         "analysis_id": analysis_id,
         "oficina": oficina,

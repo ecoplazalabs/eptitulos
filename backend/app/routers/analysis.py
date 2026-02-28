@@ -17,7 +17,8 @@ from app.models.analysis import (
     CreateAnalysisRequest,
 )
 from app.models.common import ApiResponse, PaginatedResponse
-from app.services.analysis_service import AnalysisService
+from app.repositories.analysis_repository import AnalysisNotFoundError
+from app.services.analysis_service import AnalysisNotCancellableError, AnalysisService
 from app.services.storage_service import StorageError, StorageService
 
 logger = structlog.get_logger(__name__)
@@ -140,3 +141,72 @@ async def get_pdf(
         media_type="application/pdf",
         filename=f"copia_literal_{analysis_id}.pdf",
     )
+
+
+@router.delete(
+    "/analyses/{analysis_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_analysis(
+    analysis_id: str,
+    current_user: dict = Depends(get_current_user),
+    service: AnalysisService = Depends(get_analysis_service),
+) -> None:
+    """
+    Hard-delete an analysis owned by the authenticated user.
+
+    Returns 404 if the analysis does not exist or belongs to another user.
+    Returns 409 if the analysis is currently in 'processing' status.
+    Returns 204 No Content on success.
+    """
+    user_id: str = current_user["id"]
+    logger.info("delete_analysis_request", user_id=user_id, analysis_id=analysis_id)
+
+    try:
+        await service.delete_analysis(analysis_id=analysis_id, user_id=user_id)
+    except AnalysisNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found",
+        ) from None
+    except AnalysisNotCancellableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from None
+
+
+@router.post(
+    "/analyses/{analysis_id}/cancel",
+    response_model=ApiResponse[AnalysisDetailResponse],
+)
+async def cancel_analysis(
+    analysis_id: str,
+    current_user: dict = Depends(get_current_user),
+    service: AnalysisService = Depends(get_analysis_service),
+) -> ApiResponse[AnalysisDetailResponse]:
+    """
+    Cancel a pending or processing analysis.
+
+    Sets status to 'failed' with error_message 'Cancelled by user'.
+    Returns 404 if the analysis does not exist or belongs to another user.
+    Returns 409 if the analysis status is not 'pending' or 'processing'.
+    Returns the updated analysis on success.
+    """
+    user_id: str = current_user["id"]
+    logger.info("cancel_analysis_request", user_id=user_id, analysis_id=analysis_id)
+
+    try:
+        updated = await service.cancel_analysis(analysis_id=analysis_id, user_id=user_id)
+    except AnalysisNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Analysis not found",
+        ) from None
+    except AnalysisNotCancellableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from None
+
+    return ApiResponse(data=updated)

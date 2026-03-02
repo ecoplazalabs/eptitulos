@@ -112,6 +112,7 @@ class AnalysisDetailResponse(BaseModel):
     informe: str | None = None
     cargas_encontradas: list[Carga]
     error_message: str | None = None
+    pdf_storage_path: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
     duration_seconds: int | None = None

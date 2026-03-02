@@ -199,6 +199,7 @@ def _map_to_detail(record: dict) -> AnalysisDetailResponse:
         informe=record.get("informe"),
         cargas_encontradas=cargas,
         error_message=record.get("error_message"),
+        pdf_storage_path=record.get("pdf_path"),
         started_at=record.get("started_at"),
         completed_at=record.get("completed_at"),
         duration_seconds=record.get("duration_seconds"),
